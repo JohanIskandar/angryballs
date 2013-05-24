@@ -11,7 +11,7 @@ import java.util.*;
 
 public class AngryBall extends BasicGame{
   
-	//set the screensize for display
+	//set the screen size for display
 	static int screenHeight = 800;
 	static int screenWidth = 600;
   
@@ -36,19 +36,19 @@ public class AngryBall extends BasicGame{
     Rectangle enemyRectangle[][];
     Rectangle playerRectangle;
     
-    		Rectangle planeRectangle;
     
     //-----------    	
     float rotation=0f;
 	float hip=0f;   
     float velocity = 0.1f;
     boolean isBallMoving = false;
+    
+    Badge badge;
     Ball powerBall;
     Block [][]block;
     //Rectangle enemy = new Rectangle(e.X,e.Y,e.Width,e.Height);
     
-    		//Image plane = null;
-    
+
     
     public AngryBall()
     {
@@ -58,6 +58,9 @@ public class AngryBall extends BasicGame{
     @Override
     public void init(GameContainer gc)
             throws SlickException {
+    	
+    	gc.setShowFPS(false); 
+    	
         background = new Image("images/gokung.png");
         
         			//plane = new Image("images/plane.png");
@@ -71,6 +74,7 @@ public class AngryBall extends BasicGame{
     {
         //creating objects
         try {
+        	badge = new Badge();
             powerBall = new Ball();
             playerRectangle = new Rectangle(powerBall.getX(),powerBall.getY(),
             								powerBall.getBallImage().getWidth(),
@@ -250,15 +254,18 @@ public class AngryBall extends BasicGame{
             throws SlickException
     {
     	
+    	//render all the objects
         background.draw(0, 0); //draw background
-
         powerBall.drop(x,y,scale);
-        
-        		//plane.draw(100,300);
+        badge.addStar(screenWidth-badge.getBadgeImage().getWidth(),0,1);
         
         showBlock();
-		//block[10].destroy(500,485);
 
+        //display the score
+        g.drawString("Score: ", 0, 0 );
+        
+		//plane.draw(100,300);
+        //block[10].destroy(500,485);
 		//isBallMoving = false;
 
     }
