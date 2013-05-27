@@ -14,7 +14,8 @@ public class AngryBall extends BasicGame{
 	//set the screen size for display
 	static int screenHeight = 800;
 	static int screenWidth = 600;
-  
+	boolean hasSetPos = false;
+
     Image background = null;
        
     float x = screenWidth/2;
@@ -30,12 +31,20 @@ public class AngryBall extends BasicGame{
     final int column=6;
     int maxNoBlock=row * column;
     int blockMode;
+    int gemMode;
     float initX = screenWidth/2;
     float initY = 250;
     
-    Rectangle enemyRectangle[][];
-    Rectangle playerRectangle;
+    Rectangle blockRectangle[][];
+    Rectangle powerBallRectangle;
+    Rectangle gemRectangle[][];
     
+    //score calculation
+    int totalScore=0;
+    int hitBlockScore = 10;
+    int hitGemScore = 10;
+    int noGemHit = 0;
+    int level=1;
     
     //-----------    	
     float rotation=0f;
@@ -43,13 +52,19 @@ public class AngryBall extends BasicGame{
     float velocity = 0.1f;
     boolean isBallMoving = false;
     
+    Score score;
     Badge badge;
     Ball powerBall;
-    Block [][]block;
+    Block[][] block;
+    Gem[][] gem;
+    
+	int maxGem=5;
+	int posX=0;
+	int posY=0;	
+	int[][] gemPos;
+	
     //Rectangle enemy = new Rectangle(e.X,e.Y,e.Width,e.Height);
-    
-
-    
+      
     public AngryBall()
     {
         super("Angry Balls");
@@ -73,22 +88,29 @@ public class AngryBall extends BasicGame{
     public void createItem()
     {
         //creating objects
-        try {
+        try 
+        {
+        	score = new Score();
         	badge = new Badge();
             powerBall = new Ball();
-            playerRectangle = new Rectangle(powerBall.getX(),powerBall.getY(),
+            powerBallRectangle = new Rectangle(powerBall.getX(),powerBall.getY(),
             								powerBall.getBallImage().getWidth(),
             								powerBall.getBallImage().getHeight());
             
             block = new Block[row][column];
-            enemyRectangle = new Rectangle[row][column];
-             
+            gem = new Gem[row][column];
+            blockRectangle = new Rectangle[row][column];
+            gemRectangle = new Rectangle[row][column];            
+            
             for (int i=0; i<row; i++)
             {
             	for(int j=0; j<column; j++)
             	{   	            	 
 					block[i][j] = new Block();
-					enemyRectangle[i][j] = new Rectangle(0,0,0,0);  //initilise it first with the dummy boundary
+					gem[i][j] = new Gem();
+					
+					blockRectangle[i][j] = new Rectangle(0,-100,0,0);  //initilise it first with the dummy boundary
+					gemRectangle[i][j] = new Rectangle(0,-100,0,0);  //initilise it first with the dummy boundary
             	}
             }
             
@@ -158,8 +180,9 @@ public class AngryBall extends BasicGame{
         	//set the boundary for a balls, so it has to bound back
         	if (x >= 0 && x < (screenWidth - powerBall.getBallImage().getWidth() ) )
         	{
+        		
 		        //calculate the drawing position for the ball
-		        hip = 0.1f * delta;
+		        hip = 0.25f * delta; //set the velocity
 		        rotation = powerBall.getRotation();
 		        x-= hip * Math.sin(Math.toRadians(-1 * rotation));
 		        y-= hip * Math.cos(Math.toRadians(-1 * rotation));
@@ -219,7 +242,7 @@ public class AngryBall extends BasicGame{
         //if(playerRectangle.intersects(planeRectangle))
         	//isBallMoving = false;
         
-        playerRectangle.setBounds(x,y, powerBall.getBallImage().getWidth(), powerBall.getBallImage().getHeight());        
+        powerBallRectangle.setBounds(x,y, powerBall.getBallImage().getWidth(), powerBall.getBallImage().getHeight());        
 
         /*
         for(int i=0;i<maxNoBlock;i++)
@@ -240,16 +263,26 @@ public class AngryBall extends BasicGame{
         */
     }
   
-    public boolean intersectBallBlock(Rectangle player, Rectangle enemy)
+    public boolean intersectBallBlock(Rectangle powerBall, Rectangle block)
     {
-        if(player.intersects(enemy))
+        if(powerBall.intersects(block))
         {
         	return true;
         }
         
     	return false;
     }
-    
+
+    public boolean intersectBallGem(Rectangle powerBall, Rectangle gem)
+    {
+        if(powerBall.intersects(gem))
+        {
+        	return true;
+        }
+        
+    	return false;
+    }
+
     public void render(GameContainer gc, Graphics g)
             throws SlickException
     {
@@ -260,9 +293,12 @@ public class AngryBall extends BasicGame{
         badge.addStar(screenWidth-badge.getBadgeImage().getWidth(),0,1);
         
         showBlock();
+        showGem();
 
         //display the score
-        g.drawString("Score: ", 0, 0 );
+        g.drawString("Score: " + score.getScore(), 0, 0 );
+        g.drawString("Level: " + level, 100, 0 );
+        g.drawString("Gem Collected: " + noGemHit, 200, 0 );
         
 		//plane.draw(100,300);
         //block[10].destroy(500,485);
@@ -294,7 +330,7 @@ public class AngryBall extends BasicGame{
 	    	{					
 	    		//create a boundary
 	    	    //purpose can be later used for collision detection
-	    		enemyRectangle[i][j].setBounds(blockX,blockY,
+	    		blockRectangle[i][j].setBounds(blockX,blockY,
 											blockWidth,
 											blockHeight);
 				blockX = blockX + blockWidth;				
@@ -304,6 +340,8 @@ public class AngryBall extends BasicGame{
     	}    	
     }
     
+    
+    //set the type of block
     public void setBlockMode()
     {    	
     	for(int i=0; i<row; i++)
@@ -327,6 +365,60 @@ public class AngryBall extends BasicGame{
     	}
     }
     
+    public void showGem()
+    {    	
+    	if(!hasSetPos)
+    	{
+    		gemPos = new int [row][column];
+	    	for(int i=0; i<maxGem; i++)
+	    	{
+	    		posX = (int)Math.round(Math.random() * (row-1));
+	    		posY = (int)Math.round(Math.random() * (column-1));
+	
+	    		//set for different gems
+    			int k = 1 + (int)(Math.round(Math.random() * 4)); 
+	    	    gemMode = k;
+	    	    gem[posX][posY].setGemMode(gemMode);
+
+	    		//set the gem that displays on the screen
+	    		gemPos[posX][posY] = 1;
+	    	}    	
+	    	hasSetPos = true;
+    	}
+    	
+    	//blocks and gems has the same size
+    	float blockWidth = 100f; 
+    	float blockHeight = 35f;
+    	
+    	blockX = 0;
+    	blockY = screenHeight - blockHeight;
+
+        //check for the gems that meant to be draws on the screen
+    	//gem[0][0].addGem(0, 0, 1);
+        for(int i=0; i<row; i++)
+        {
+        	for(int j=0; j<column; j++)
+        	{
+        		if(gemPos[i][j] == 1)
+        		{ 
+        			gemMode = gem[i][j].getGemMode();
+    	    		gem[i][j].addGem(blockX,blockY,gemMode);
+    	    		//it is not disappeared yet
+    	    		if(gemMode != 0) 
+    	    			gemRectangle[i][j].setBounds(blockX,blockY,blockWidth,blockHeight);
+    	    	
+    	    		block[i][j].setBlockMode(0);  //remove the block because we know that gem takes place
+    	    		blockRectangle[i][j].setBounds(0,-100,0,0);
+        		}
+        		
+        		blockX = blockX + blockWidth;
+        	}
+        	
+        	blockX = 0;
+        	blockY = blockY - blockHeight;   
+        }
+    }
+    
     public void showBlock()
     {
     	float blockWidth = 100f; 
@@ -348,37 +440,83 @@ public class AngryBall extends BasicGame{
 	    		
 	    		//laying down blocks
 	    		block[i][j].addBlock(blockX,blockY,blockMode);
-	    						System.out.println("block location: " + blockX + " " + blockY);
-					    		
+System.out.println("block location: " + blockX + " " + blockY);    	    	
+
 				blockX = blockX + blockWidth;
 				
 				//check for collision
-				if(intersectBallBlock(playerRectangle, enemyRectangle[i][j]))
-	        	{
+				if(intersectBallBlock(powerBallRectangle, blockRectangle[i][j]))
+	        	{										
 					isBallMoving  = false;
 					powerBall.randomBallMode();
 					//blockMode = 0; //0 means empty
-
-					if(blockMode == 1) 						
-						block[i][j].setBlockMode(--blockMode);
-					else if(blockMode == 6)  //convert from solid ice to half solid						
-						block[i][j].setBlockMode(--blockMode);
+					totalScore = score.getScore();
+					
+					if(blockMode == 1)
+					{
+						totalScore += hitBlockScore;
+						score.setScore(totalScore);
+						block[i][j].setBlockMode(0);
+						blockRectangle[i][j].setBounds(0,-100,0,0);	//remove the boundary, so collision wont happen
+					}					
+					else if(blockMode == 6)  //convert from solid ice to half solid
+					{
+						totalScore += hitBlockScore;
+						score.setScore(totalScore);
+						block[i][j].setBlockMode(5);
+					}					
 					else if(blockMode == 5)
 					{
+						totalScore += hitBlockScore;
+						score.setScore(totalScore);
 						block[i][j].setBlockMode(0); //the block is gone when it is 0					
+						blockRectangle[i][j].setBounds(0,-100,0,0);	//remove the boundary, so collision wont happen
 					}						
 					
-					//allows the penetration, block is destroyed
-					if(blockMode == 0 )					
-						enemyRectangle[i][j].setBounds(0,0,0,0);	//remove the boundary, so collision wont happen
-		    		
+					
+/*					//allows the penetration, block is destroyed
+					if(blockMode == 0 )
+					{
+						blockRectangle[i][j].setBounds(0,0,0,0);	//remove the boundary, so collision wont happen
+					}
+*/		    		
+					//reset the powerball position
 					x= initX;
 					y= initY;
 					powerBall.drop(x,y,scale);
-	        	}       
+	        	}
+				
+				if(intersectBallGem(powerBallRectangle, gemRectangle[i][j]))
+	        	{			
+					isBallMoving = false;
+					gemMode = gem[i][j].getGemMode();
+					hitGemScore = hitGemScore * gemMode;
+					totalScore = score.getScore();
+					totalScore += hitBlockScore;
+					score.setScore(totalScore);
+
+					gem[i][j].setGemMode(0); //the gem is gone when it is 0 
+					gemRectangle[i][j].setBounds(0,-100,0,0);	//remove the boundary, so collision wont happen
+					noGemHit++;
+					
+					//level is finished
+					if(noGemHit >= 3)
+					{
+						//reset and move to the next level
+						createItem();
+						level++;
+						noGemHit = 0;
+					}
+					
+					//reset the powerball position
+					x= initX;
+					y= initY;
+					powerBall.drop(x,y,scale);
+	        	}
+
 	    	}
     		blockX = 0;
-        	blockY = blockY - blockHeight;	    	
+        	blockY = blockY - blockHeight;        	
     	}
     	
     	//enemyRectangle[55] = new Rectangle(0,600, Block.getBlockImage().getWidth(), Block.getBlockImage().getHeight());    	 
