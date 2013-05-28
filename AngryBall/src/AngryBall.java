@@ -4,12 +4,12 @@ import org.newdawn.slick.GameContainer;
 import org.newdawn.slick.Graphics;
 import org.newdawn.slick.Image;
 import org.newdawn.slick.Input;
+import org.newdawn.slick.Music;
 import org.newdawn.slick.SlickException;
 import org.newdawn.slick.geom.Rectangle;
+import org.newdawn.slick.KeyListener;
 
-import java.util.*;
-
-public class AngryBall extends BasicGame{
+public class AngryBall extends BasicGame implements KeyListener{
   
 	//set the screen size for display
 	static int screenHeight = 800;
@@ -45,6 +45,7 @@ public class AngryBall extends BasicGame{
     int hitGemScore = 10;
     int noGemHit = 0;
     int level=1;
+    int starMode=1;
     
     //-----------    	
     float rotation=0f;
@@ -57,19 +58,27 @@ public class AngryBall extends BasicGame{
     Ball powerBall;
     Block[][] block;
     Gem[][] gem;
+    Thunder thunder;
     
 	int maxGem=5;
 	int posX=0;
 	int posY=0;	
 	int[][] gemPos;
+	int noOfThunder;
+	boolean canCreateThunder=false;
+	
+	Music backgroundMusic;
+	Music shootBallMusic;
+	Music collideBlockMusic;
+	Music collideGemMusic;
 	
     //Rectangle enemy = new Rectangle(e.X,e.Y,e.Width,e.Height);
       
     public AngryBall()
     {
         super("Angry Balls");
-    }
-  
+    }    
+    
     @Override
     public void init(GameContainer gc)
             throws SlickException {
@@ -80,9 +89,17 @@ public class AngryBall extends BasicGame{
         
         			//plane = new Image("images/plane.png");
         			//planeRectangle = new Rectangle(100,300,plane.getWidth(),plane.getHeight());
-        
+    	score = new Score();        
         createItem();        
         
+        //play music
+        backgroundMusic = new Music("/music/dgtheme.wav");
+        backgroundMusic.play();
+        backgroundMusic.loop();
+        
+    	shootBallMusic = new Music("music/gunfire.wav");
+    	collideGemMusic = new Music("music/gemCollected.wav");
+
     }
   
     public void createItem()
@@ -90,7 +107,6 @@ public class AngryBall extends BasicGame{
         //creating objects
         try 
         {
-        	score = new Score();
         	badge = new Badge();
             powerBall = new Ball();
             powerBallRectangle = new Rectangle(powerBall.getX(),powerBall.getY(),
@@ -100,7 +116,11 @@ public class AngryBall extends BasicGame{
             block = new Block[row][column];
             gem = new Gem[row][column];
             blockRectangle = new Rectangle[row][column];
-            gemRectangle = new Rectangle[row][column];            
+            gemRectangle = new Rectangle[row][column];
+            thunder = new Thunder();
+            
+            //get the number of thunder (amulet)
+            noOfThunder = thunder.getNumberOfThunder();
             
             for (int i=0; i<row; i++)
             {
@@ -135,6 +155,8 @@ public class AngryBall extends BasicGame{
         if(input.isKeyDown(Input.KEY_ENTER))
         {
         	isBallMoving = true;
+        	shootBallMusic.play();
+        	
         	/*
             float hip = 0.4f * delta;    
   
@@ -170,11 +192,14 @@ public class AngryBall extends BasicGame{
         	//System.out.println(hip + " delta:" + delta  + "rotation: " + powerBall.getRotation() );
         }
         
-        if(input.isKeyDown(Input.KEY_A))
+        if(input.isKeyDown(Input.KEY_T))
         {
-            //plane.rotate(-0.2f * delta);
-        }        
-        
+        	noOfThunder = thunder.getNumberOfThunder();
+        	if(noOfThunder>0)
+        		canCreateThunder = true;
+            //new Thunder();
+        }                            
+
         if(isBallMoving)
         { 
         	//set the boundary for a balls, so it has to bound back
@@ -275,8 +300,9 @@ public class AngryBall extends BasicGame{
 
     public boolean intersectBallGem(Rectangle powerBall, Rectangle gem)
     {
-        if(powerBall.intersects(gem))
+        if(powerBall.intersects(gem))        	
         {
+        	collideGemMusic.play();
         	return true;
         }
         
@@ -290,15 +316,54 @@ public class AngryBall extends BasicGame{
     	//render all the objects
         background.draw(0, 0); //draw background
         powerBall.drop(x,y,scale);
-        badge.addStar(screenWidth-badge.getBadgeImage().getWidth(),0,1);
+        starMode = badge.getStarMode();
+        badge.addStar(screenWidth-badge.getBadgeImage().getWidth(),0,starMode);
         
         showBlock();
         showGem();
 
+        totalScore = score.getScore();
+        if(totalScore >= 0 && totalScore <100 )
+        {
+        	badge.setStarMode(1);
+        }
+        else if(totalScore >= 100 && totalScore <200 )
+        {
+        	badge.setStarMode(2);
+        }
+        else if(totalScore >= 300 && totalScore <400 )
+        {
+        	badge.setStarMode(3);
+        }
+        else if(totalScore >= 400 && totalScore <500 )
+        {
+        	badge.setStarMode(4);
+        }
+        else if(totalScore >= 500 && totalScore <600 )
+        {
+        	badge.setStarMode(5);
+        }
+        else if(totalScore >= 600 && totalScore <700 )
+        {
+        	badge.setStarMode(6);
+        }
+        else if(totalScore >= 700)
+        {
+        	badge.setStarMode(7);        	
+        }
+        	
         //display the score
-        g.drawString("Score: " + score.getScore(), 0, 0 );
+        g.drawString("Score: " + totalScore, 0, 0 );
         g.drawString("Level: " + level, 100, 0 );
         g.drawString("Gem Collected: " + noGemHit, 200, 0 );
+        g.drawString("Thunder: " + noOfThunder, 0, 30);
+        
+        if(canCreateThunder)
+        {
+        	canCreateThunder = false;
+
+        	thunder.generateThunder();
+        }
         
 		//plane.draw(100,300);
         //block[10].destroy(500,485);
@@ -499,9 +564,9 @@ System.out.println("block location: " + blockX + " " + blockY);
 					gemRectangle[i][j].setBounds(0,-100,0,0);	//remove the boundary, so collision wont happen
 					noGemHit++;
 					
-					//level is finished
+					//level is finished, we make it 3 hits for each level
 					if(noGemHit >= 3)
-					{
+					{							
 						//reset and move to the next level
 						createItem();
 						level++;
@@ -510,7 +575,7 @@ System.out.println("block location: " + blockX + " " + blockY);
 					
 					//reset the powerball position
 					x= initX;
-					y= initY;
+					y= initY;				
 					powerBall.drop(x,y,scale);
 	        	}
 
@@ -522,4 +587,19 @@ System.out.println("block location: " + blockX + " " + blockY);
     	//enemyRectangle[55] = new Rectangle(0,600, Block.getBlockImage().getWidth(), Block.getBlockImage().getHeight());    	 
     	
     }
+    
+    public void keyReleased(int key, char c) 
+    {
+    	//the thunder key is released
+    	if( (key == Input.KEY_T)  )
+    	{
+        	noOfThunder = thunder.getNumberOfThunder();
+        	if(noOfThunder > 0)
+        	{
+	        	thunder.setNumberOfThunder(--noOfThunder);
+	        	noGemHit++;
+        	}
+    	}
+    }
+
 }
